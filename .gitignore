@@ -1,0 +1,21 @@
+# data and outputs
+data/
+data_real/
+synth/
+runs/
+to_label/
+shots*/
+*.mp4
+*.avi
+*.csv
+detections_cache.pkl
+
+# secrets
+.env
+*.key
+
+# python
+__pycache__/
+.ipynb_checkpoints/
+venv/
+*.pyc
