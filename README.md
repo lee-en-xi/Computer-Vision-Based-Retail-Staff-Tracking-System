@@ -66,7 +66,7 @@ The system tells you **which frames** contain the staff member and **where** the
 
 | Purpose | Model | Details |
 | --- | --- | --- |
-| 🏷️ Name-tag detector | **YOLO11s**, fine-tuned by me (Model B) | 9.4 M parameters, input 960 px, about 10 to 17 ms per image on a T4 GPU |
+| 🏷️ Name-tag detector | **YOLO11s**, fine-tuned by the developer (Model B) | 9.4 M parameters, input 960 px, about 10 to 17 ms per image on a T4 GPU |
 | 🧍 Person detector | **YOLO11m** (pretrained, person class only) | Input 1280 px, confidence 0.10 |
 | 🔗 Person tracker | **ByteTrack** (inside Ultralytics) | track_buffer 90, match_thresh 0.9 |
 
