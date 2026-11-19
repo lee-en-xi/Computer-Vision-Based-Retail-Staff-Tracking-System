@@ -1,21 +1,32 @@
-# data and outputs
+# data and training outputs (too large for GitHub)
 data/
-data_real/
-synth/
+datasets/
 runs/
-to_label/
-shots*/
+*.pkl
+
+# videos and result files
 *.mp4
 *.avi
-*.csv
-detections_cache.pkl
+*.mov
+results*/
+*_annotated.mp4
+*_green.mp4
 
-# secrets
+# downloaded base models (they download automatically)
+yolo11*.pt
+yolov8*.pt
+
+# secrets: never upload
 .env
 *.key
 
-# python
+# Python and notebook clutter
 __pycache__/
-.ipynb_checkpoints/
-venv/
 *.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# computer clutter
+.DS_Store
+Thumbs.db
