@@ -1,102 +1,143 @@
-# Computer-Vision-Based Retail Staff Tracking System
+# 🛍️ Computer-Vision-Based Retail Staff Tracking System
 
-Find the staff member in an overhead-camera video using only the small piano-key **name tag** on their chest, and report **which frames** contain the staff member (Task 1) and **where** they are, as x, y coordinates (Task 2, bonus).
+**Find the staff member in an overhead camera video using only the small name tag on their chest.**
 
-The system does not use clothing colour, height or appearance, because the staff member changes clothes in the sample video and other people wear similar colours. The name tag is the only identity clue.
+The system tells you **which frames** contain the staff member and **where** they are (x, y). It does not look at clothing colour, height or appearance, because the staff member changes clothes in the sample video and other people wear similar colours. **The name tag is the only clue.**
+
+> Built for the FootfallCam AI Evaluation task. Sample video: 960 x 720, 25 fps, 53.6 s, 1,341 frames, a crowded office.
 
 ---
 
-## 1. Results at a glance
+## ✨ At a Glance
+
+| | |
+| --- | --- |
+| 🎯 **Task 1** | Which frames contain the staff member? |
+| 📍 **Task 2 (bonus)** | Where is the staff member, as x, y coordinates? |
+| 🏷️ **Identity clue** | A small piano-key name tag, only about 17 x 11 pixels |
+| 🧠 **Models** | YOLO11s tag detector (trained by me) + YOLO11m person detector + ByteTrack |
+| ✅ **Tag detector score (test windows)** | Recall 0.96 · mAP50 0.95 |
+| 🚫 **False-alarm check** | 0 false alarms at the 0.62 cut-off on 2 tag-free videos |
+
+---
+
+## 🔑 Key Features
+
+- **Name tag only.** Works even when clothes change, so it can later run on a real camera.
+- **Strict by design.** A person is called staff only when the tag scores **0.62 or higher**. A missed frame is better than naming the wrong person.
+- **Keeps following when the tag is hidden.** The same person ID is followed for a few seconds, then the path is predicted from the last direction and speed, inside a limited search circle.
+- **Easy to read output.** Green means the position is sure, yellow means it is estimated, and every frame shows the time, frame number and x, y.
+- **Two scripts.** A full version and a simple version that draws a green box only when the tag is clearly seen.
+
+---
+
+## 🧩 How It Works
+
+```
+        Video frame
+             │
+     ┌───────┴────────┐
+     ▼                ▼
+ Tag detector    Person detector + ByteTrack
+ (YOLO11s)       (YOLO11m, gives each person an ID)
+     │                │
+     └───────┬────────┘
+             ▼
+        Staff rules
+   • tag score 0.62 or more on a person  →  STAFF (sure)
+   • tag hidden, same person ID          →  keep following (sure)
+             │
+             ▼
+   Output video with a point, circle and x, y
+```
+
+**What you see on the video**
+
+| Mark | Meaning |
+| --- | --- |
+| 🟩 Thin green box + score | A name tag detected with score 0.62 or higher |
+| 🟢 Green dot with a ring | Staff position is **sure** (state `tag`, `track` or `tag-only`) |
+| 🟡 Yellow circle | Staff position is **estimated**, the circle grows with time since the last sure frame (state `predicted`) |
+| ⬛ Black banner | Time, frame number and state |
+
+---
+
+## 🤖 Models Used
+
+| Purpose | Model | Details |
+| --- | --- | --- |
+| 🏷️ Name-tag detector | **YOLO11s**, fine-tuned by me (Model B) | 9.4 M parameters, input 960 px, about 10 to 17 ms per image on a T4 GPU |
+| 🧍 Person detector | **YOLO11m** (pretrained, person class only) | Input 1280 px, confidence 0.10 |
+| 🔗 Person tracker | **ByteTrack** (inside Ultralytics) | track_buffer 90, match_thresh 0.9 |
+
+**Why YOLO?** It scans the picture once, so it is fast enough for video, and it works well for tiny objects at high resolution. **Why ByteTrack?** It also uses weak, blurry detections, so a fast-moving person is not dropped as easily.
+
+---
+
+## ⚙️ Installation
+
+**1. Clone the repository**
+
+```
+git clone https://github.com/lee-en-xi/Computer-Vision-Based-Retail-Staff-Tracking-System.git
+cd Computer-Vision-Based-Retail-Staff-Tracking-System
+```
+
+**2. Install the packages**
+
+```
+pip install -r requirements.txt
+```
+
+> 💡 A GPU is recommended. On a laptop without a GPU the person model is slow. In that case set `PERSON_IMGSZ = 960` at the top of the script.
+
+---
+
+## ▶️ How to Run
+
+**1. Open the script** (`run_video.py` for the full version, `run_video_simple.py` for the simple one).
+
+**2. Change one line** at the top to your video path:
+
+```python
+VIDEO = "path/to/your_video.mp4"
+```
+
+The tag model is found automatically at `weights/name_tag_best_model.pt`, so keep that folder.
+
+**3. Run it**
+
+```
+python run_video.py
+```
+
+**4. Get the results.** The script writes **one video** next to your video and prints a summary.
+
+| Script | What it does | Output video |
+| --- | --- | --- |
+| `run_video.py` | Full version: tag + person tracking + hidden-tag handling | `<video name>_annotated.mp4` |
+| `run_video_simple.py` | Simple version: staff box only when the tag scores 0.62 or higher, no prediction | `<video name>_green.mp4` |
+
+The first run downloads `yolo11m.pt` by itself, so it needs internet once. The scripts also run in Google Colab: paste one into a cell, set `VIDEO` to a path in your Drive, and run.
+
+**Printed summary (full version):** total frames, frames with a clearly seen tag, the count of each state (`tag`, `tag-only`, `track`, `predicted`, `none`), and a table of the moments with start and end times.
+
+---
+
+## 📊 Results
+
+### Sample video
 
 | Item | Result |
 | --- | --- |
-| Tag detector (Model B), test windows | Recall 0.96, mAP50 0.95, mAP50-95 0.62 |
-| Sample video: frames where the tag is clearly seen (score 0.62 or higher) | 209 of 1,341 frames (15.6%), in 16 moments |
-| Sample video: frames with a staff position, including estimated ones (offline notebook pipeline) | 762 of 1,341 frames |
-| Tag-free negative test 1 (306 frames) | 0 frames flagged, highest score 0.00 |
-| Tag-free negative test 2 (391 frames) | 0 frames flagged, highest score 0.61 (just under the 0.62 cut-off) |
+| Frames where the tag is clearly seen (0.62 or higher) | **209 of 1,341 (15.6%)**, in 16 moments between 13.6 s and 48.4 s |
+| Frames with a staff position, including estimated ones (notebook pipeline with gap filling) | **762 of 1,341** |
 
-End-to-end precision and recall against a full hand-labelled answer key are **not measured yet** (see Limitations).
+In the frames between the 16 moments, the staff member is still in the room but the tag is not readable, so the position is estimated.
 
----
+### Tag detector: Model A vs Model B
 
-## 2. Repository contents
-
-```
-README.md                 this file
-requirements.txt          Python packages
-.gitignore
-run_video.py              full pipeline, frame by frame (tag + person tracking + hidden-tag handling)
-run_video_simple.py       simple version: no tracking, no prediction
-notebooks/
-  01_train_name_tag_detector.ipynb   data, synthetic images, training models A and B, evaluation
-  02_test_on_video.ipynb             tracking and testing on the video, negative tests
-weights/
-  name_tag_best_model.pt  trained name-tag detector (Model B)
-sample_output/            example results (CSV, demo video)
-```
-
-The notebooks are for **reading** how the work was done. The two `run_video*.py` scripts are what you **run** on a new video.
-
----
-
-## 3. Models used
-
-| Purpose | Model | Notes |
-| --- | --- | --- |
-| Name-tag detector | **YOLO11s** (Ultralytics), fine-tuned by me | 9.4 M parameters, 21.4 GFLOPs, input size 960 px. About 10 to 17 ms per image on a Tesla T4 |
-| Person detector | **YOLO11m** (pretrained COCO, person class only) | Input size 1280 px, confidence 0.10 |
-| Person tracker | **ByteTrack** (built into Ultralytics) | Custom settings: track_buffer 90, match_thresh 0.9, track_high_thresh 0.25, track_low_thresh 0.10 |
-
-**Why YOLO:** it scans the whole picture in one pass, so it is fast enough for video, works well for small objects at high resolution (the tag is only about 17 x 11 px in a 960 x 720 frame), and trains with little data. **Why YOLO11:** the newer generation, reported by its authors to be more accurate than YOLOv8 at a similar size.
-
-**Why ByteTrack:** it also uses weak, blurry detections, so a fast-moving person is not dropped as easily.
-
----
-
-## 4. How the system works
-
-1. **Tag detector** looks for the name tag in every frame and gives each detection a confidence score.
-2. **Person tracker** finds every person and gives each an ID number that follows them across frames.
-3. **Staff rules:**
-   - A tag with score **0.62 or higher** on a person confirms that person as staff (state `tag`).
-   - A strong tag with no person box around it (person missed, for example when blurred) still counts, shown on the tag itself (state `tag-only`).
-   - When the tag is hidden, the same person ID keeps the staff label for up to 3 seconds (state `track`).
-   - If that person is lost, the position is predicted from the last direction and speed for up to 1.5 seconds, inside a search circle that grows with time and is capped at 160 px (state `predicted`).
-4. **Output:** a point, with a circle of uncertainty when the position is estimated, plus the frame time and x, y coordinates.
-
-On screen: a thin green box and score on every strong tag, a green dot with a ring when the position is sure, a yellow circle when it is estimated, and a black banner with time, frame number and state.
-
----
-
-## 5. How the tag detector was trained
-
-1. **Real data.** I cut the clearest views of the tag out of the sample video, removed the background, and labelled the tag in Roboflow by drawing a box around it. There were too few real examples.
-2. **Synthetic data.** A person-segmentation step finds people in video frames, and a cut-out tag is pasted onto each person's torso at a realistic size (8 to 32 px wide), with blur matched to the tag type. Moving people are favoured, and a paste is accepted only if at least 85% of the tag lies on the person. Each pasted tag comes with its box already known. My first version put tags on tables and hands, so I restricted them to the body. Synthetic frames come only from the **training part of the video** (before 37.8 s), skip every moment where the real tag is visible, use every 3rd frame and make up to 3 variants per frame. The final run produced 687 synthetic images.
-3. **Split by time, not at random.** Neighbouring frames look almost identical, so a random split would leak answers between sets. Whole time windows were held out:
-   - Validation: 38.9 to 39.4 s, 40.6 to 41.2 s, 42.4 to 43.0 s (27 images, 27 tags)
-   - Test: 44.3 to 44.9 s, 46.2 to 46.8 s, 48.0 to 48.6 s (28 images, 28 tags)
-   - Training: the other tag windows
-4. **Training set composition.**
-   - **Real images:** 128 unique labelled frames (67 with a tag, 61 background frames with no tag). Each was used 3 times (the original plus 2 copies, with augmentation applied during training), giving **384 images**.
-   - **Synthetic images:** I kept **250** of the 687 generated, chosen at random with a fixed seed. Keeping only 250 stops the synthetic images from drowning out the real ones, so real data is still about 60% of the training set.
-   - **Model B total: 634 training images.** Before I trimmed the synthetic set, the training folder held 1,071 images (384 real + 687 synthetic); the models were trained on the trimmed set of 634.
-
-5. **Two models compared** (both start from pretrained YOLO11s and use identical settings):
-
-   | | Model A | Model B (chosen) |
-   | --- | --- | --- |
-   | Training data | Real images only: 384 | Real + synthetic: 634 (384 real + 250 synthetic) |
-   | Epochs | Stopped early at epoch 43 of 80 (best epoch: 18), 0.19 hours | All 80 epochs, 0.53 hours |
-   | Validation set | 27 images | 27 images |
-
-   Shared settings: Ultralytics 8.4.215 on a Tesla T4 GPU, input size 960 px, batch size 16, automatic optimiser (AdamW), early-stopping patience 25, single class `name_tag`, augmentation with mosaic, flips, rotation up to 180 degrees, scale and brightness changes.
-
----
-
-## 6. Tag detector metrics
-
-**Test windows** (never used for training or choosing the best epoch, 28 tags):
+Test windows (never used for training or choosing the best epoch, 28 tags):
 
 | Metric | Model A (real only) | Model B (real + synthetic) |
 | --- | --- | --- |
@@ -105,7 +146,7 @@ On screen: a thin green box and score on every strong tag, a green dot with a ri
 | mAP50-95: how exactly the box fits | 0.44 | **0.62** |
 | Precision: boxes that were real tags | **0.91** | 0.87 |
 
-**Validation windows** (27 tags):
+Validation windows (27 tags):
 
 | Metric | Model A | Model B |
 | --- | --- | --- |
@@ -114,87 +155,58 @@ On screen: a thin green box and score on every strong tag, a green dot with a ri
 | mAP50 | 0.94 | 0.98 |
 | mAP50-95 | 0.48 | 0.67 |
 
-**Why Model B:** it finds more of the real tags (recall 0.96 vs 0.86) and has a higher overall score (mAP50 0.95 vs 0.87). Its precision is slightly lower (0.87 vs 0.91). That is handled by accepting only detections with a score of **0.62 or higher**.
+**Why Model B?** It finds more of the real tags (recall 0.96 vs 0.86) and has a higher overall score (mAP50 0.95 vs 0.87). Its precision is slightly lower, which is handled by accepting only scores of **0.62 or higher**.
 
-The test sets are small (one tag is about 3.5 percentage points) and come from the same video, so they show how the model handles unseen moments of this video, not other cameras.
+### Why 0.62?
 
----
+Every wrong tag detection I saw in the sample video scored 0.61 or lower, so the cut-off sits just above that. It was set on one video and should be rechecked for each new camera.
 
-## 7. Why the threshold is 0.62
-
-In the sample video, every wrong tag detection I saw scored 0.61 or lower, so the cut-off is set just above that. It is a strict cut-off: it prefers missing a frame over naming the wrong person. It was set on one video and should be rechecked for each new camera.
-
----
-
-## 8. Testing on tag-free videos (false-alarm check)
+### False-alarm test on tag-free videos
 
 Two office videos from the internet with people but no staff tag. Nothing should be flagged.
 
 | Video | Frames | Frames at 0.62 or higher | Highest score |
 | --- | --- | --- | --- |
-| Tag-free test 1 | 306 | 0 | 0.00 |
-| Tag-free test 2 | 391 | 0 | 0.61 |
+| Tag-free test 1 | 306 | **0** | 0.00 |
+| Tag-free test 2 | 391 | **0** | 0.61 |
 
-In test 2, 32 frames scored 0.45 or higher. The strongest ones (0.58 to 0.61) are at about 8.7 to 9.7 s and sit on a person, probably a similar-looking badge or clothing pattern. The margin to the 0.62 cut-off is only 0.01, so more tag-free footage would make the cut-off safer.
-
----
-
-## 9. Sample video results
-
-The sample video is 960 x 720, 25 fps, 53.6 s, 1,341 frames.
-
-- **Task 1:** the tag is clearly seen (score 0.62 or higher) in **209 frames (15.6%)**, in 16 moments between 13.6 s and 48.4 s. In the frames between these moments the staff member is still in the room, but the tag is not readable, so the position is estimated.
-- **Task 2:** the offline notebook pipeline gives a position for **762 of 1,341 frames**, which includes estimated frames. It uses extra gap filling that needs future frames.
-- The live-style `run_video.py` does not use future frames, so expect fewer estimated frames than the notebook.
+In test 2, the strongest wrong detections (0.58 to 0.61) are at about 8.7 to 9.7 s and sit on a person, probably a similar-looking badge or clothing pattern. The margin to the cut-off is only 0.01, so more tag-free footage would make it safer.
 
 ---
 
-## 10. How to run
+## 🏋️ How the Tag Detector Was Trained
 
-**Install**
+1. **Real data.** I cut the clearest views of the tag out of the video, removed the background, and labelled the tag in Roboflow.
+2. **Synthetic data.** The cut-out tag is pasted onto people's torsos in video frames at a realistic size (8 to 32 px wide), with matching blur. Moving people are favoured, and a paste is accepted only if at least 85% of the tag lies on the person. Frames come only from the training part of the video (before 37.8 s) and skip every moment where the real tag is visible. The final run produced 687 synthetic images.
+3. **Split by time, not at random.** Neighbouring frames look almost identical, so a random split would leak answers. Whole time windows were held out:
+   - Validation: 38.9 to 39.4 s, 40.6 to 41.2 s, 42.4 to 43.0 s
+   - Test: 44.3 to 44.9 s, 46.2 to 46.8 s, 48.0 to 48.6 s
+4. **Training set.** Real: 128 unique frames (67 with a tag, 61 without), each used 3 times = 384 images. Synthetic: 250 kept at random out of 687. **Model B total: 634 images.**
+5. **Two models compared** (same YOLO11s settings, input 960 px, batch 16):
 
-```
-pip install -r requirements.txt
-```
+   | | Model A | Model B (chosen) |
+   | --- | --- | --- |
+   | Training data | Real only: 384 | Real + synthetic: 634 |
+   | Epochs | Stopped early at 43 of 80 (best epoch 18) | All 80 |
 
-**Run the full version** (tag + person tracking + hidden-tag handling)
-
-1. Open `run_video.py`.
-2. Change the `VIDEO` line at the top to your video path. The script finds the tag model at `weights/name_tag_best_model.pt` next to it, so keep that folder structure.
-3. Run:
-
-```
-python run_video.py
-```
-
-It writes **one video**, `<video name>_annotated.mp4`, next to your video, and prints a summary: frame counts, frames with a clearly seen tag, the count per state, and a table of the moments with start and end times.
-
-**Run the simple version** (green boxes only when the tag scores 0.62 or higher, no prediction)
-
-```
-python run_video_simple.py
-```
-
-It writes `<video name>_green.mp4` and prints a short summary.
-
-The person model `yolo11m.pt` downloads itself on the first run, so the first run needs internet. A GPU is recommended: on a CPU-only laptop the larger person model is slow, so consider lowering `PERSON_IMGSZ` to 960.
-
-The same scripts also run in Google Colab: paste a script into a cell, set `VIDEO` to a path in your Drive, and run it.
-
-**Retrain the tag detector (optional).** `notebooks/01_train_name_tag_detector.ipynb` shows the full training process. It needs a Roboflow account and your own API key, and the original dataset is not stored in this repository.
+The full process is in `notebook/01_train_name_tag_detector.ipynb`.
 
 ---
 
-## 11. Limitations
+## 📁 Repository Structure
 
-- **Hidden tag, no exact position.** Without a visible tag the output is an estimated area, not a precise point.
-- **False alarms are still possible.** One tag-free video scored 0.61, just under the cut-off.
-- **Fast, blurry walking.** If the person finder misses the staff while she turns a corner and the tag is hidden, the estimate can lag behind.
-- **Small training base.** All real examples come from one video, one tag design and one camera angle, so new lighting or a new office may need retraining.
-- **One staff member only.** With two staff, the system would need a separate tracker for each.
-- **Staff are not told apart.** The system knows "this is staff", not who. Two staff crossing paths could swap labels.
-- **Recorded video.** The notebook pipeline uses a short look-ahead; a live camera needs a delay of 1 to 2 seconds or the simpler version, and enough computing power for speed.
-- **Settings tuned on one video.** The cut-off and search radius must be rechecked for each new camera.
-- **Small test and no answer key.** The detector was tested on only 28 tags, and the estimated positions were not checked against hand-labelled frames.
+```
+├── README.md
+├── requirements.txt
+├── .gitignore
+├── run_video.py          full pipeline (tag + tracking + hidden-tag handling)
+├── run_video_simple.py   simple version (no prediction)
+├── notebook/
+│   ├── 01_train_name_tag_detector.ipynb   data, synthetic images, training, evaluation
+│   └── 02_test_on_video.ipynb             tracking and testing on the video, tag-free tests
+├── weights/
+│   └── name_tag_best_model.pt             trained name-tag detector (Model B)
+└── sample_output/        example results
+```
 
-**Next steps:** label the staff frames by hand to measure real precision and recall, test on more tag-free videos, add hard negatives to training, and add a motion-based check for fast walkers that the person finder misses.
+
