@@ -199,14 +199,14 @@ The full process is in `notebook/01_train_name_tag_detector.ipynb`.
 ├── README.md
 ├── requirements.txt
 ├── .gitignore
-├── run_video.py          full pipeline (tag + tracking + hidden-tag handling)
-├── run_video_simple.py   simple version (no prediction)
+├── run_video.py        
+├── run_video_simple.py  
 ├── notebook/
-│   ├── 01_train_name_tag_detector.ipynb   data, synthetic images, training, evaluation
-│   └── 02_test_on_video.ipynb             tracking and testing on the video, tag-free tests
+│   ├── 01_train_name_tag_detector.ipynb  
+│   └── 02_test_on_video.ipynb             
 ├── weights/
-│   └── name_tag_best_model.pt             trained name-tag detector (Model B)
-└── sample_output/        example results
+│   └── name_tag_best_model.pt             
+└── sample_output/        
 ```
 
 
