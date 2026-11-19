@@ -4,7 +4,7 @@
 
 The system tells you **which frames** contain the staff member and **where** they are (x, y). It does not look at clothing colour, height or appearance, because the staff member changes clothes in the sample video and other people wear similar colours. **The name tag is the only clue.**
 
-> Built for the FootfallCam AI Evaluation task. Sample video: 960 x 720, 25 fps, 53.6 s, 1,341 frames, a crowded office.
+> Sample video: 960 x 720, 25 fps, 53.6 s, 1,341 frames, a crowded office.
 
 ---
 
